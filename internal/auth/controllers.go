@@ -1,0 +1,177 @@
+package auth
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/JonasHaugen/multe_backend/internal/httpx"
+	"github.com/coreos/go-oidc/v3/oidc"
+
+	"golang.org/x/oauth2"
+)
+
+func GoogleLogin() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		url := AppConfig.AuthCodeURL("randomstate")
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}
+}
+
+func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+		state := queryParams.Get("state")
+		if state != "randomstate" {
+			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+
+		code := queryParams.Get("code")
+
+		provider, err := oidc.NewProvider(r.Context(), "https://accounts.google.com")
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error creating oidc provider:", err)
+			return
+		}
+
+		// Configure an OpenID Connect aware OAuth2 client.
+		oauth2Config := oauth2.Config{
+			ClientID:     AppConfig.ClientID,
+			ClientSecret: AppConfig.ClientSecret,
+			RedirectURL:  AppConfig.RedirectURL,
+
+			// Discovery returns the OAuth2 endpoints.
+			Endpoint: provider.Endpoint(),
+
+			// "openid" is a required scope for OpenID Connect flows.
+			Scopes: []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail},
+		}
+
+		// Create an ID Token verifier.
+		idTokenVerifier := provider.Verifier(&oidc.Config{ClientID: AppConfig.ClientID})
+
+		oauth2Token, err := oauth2Config.Exchange(r.Context(), code)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error exchanging token:", err)
+			return
+		}
+
+		// Extract the ID Token from OAuth2 token.
+		rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+		if !ok {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error extracting raw id_token:", err)
+			return
+		}
+
+		// Parse and verify ID Token payload.
+		idToken, err := idTokenVerifier.Verify(r.Context(), rawIDToken)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error parsing and verifying id token payload:", err)
+			return
+		}
+
+		// Extract custom claims
+		var claims struct {
+			Sub           string `json:"sub"`
+			Email         string `json:"email"`
+			EmailVerified bool   `json:"email_verified"`
+			Name          string `json:"name"`
+			Picture       string `json:"picture"`
+		}
+		if err := idToken.Claims(&claims); err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error extracting custom claims:", err)
+			return
+		}
+
+		b := make([]byte, 32)
+		rand.Read(b)
+		token := base64.RawURLEncoding.EncodeToString(b)
+		hash := sha256.Sum256([]byte(token))
+		tokenHash := hex.EncodeToString(hash[:])
+		expiresAt := time.Now().AddDate(0, 0, 30)
+
+		// Begin a transaction
+		tx, err := Auth.DB.BeginTx(r.Context(), nil)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error creating transaction:", err)
+			return
+		}
+
+		defer func() {
+			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+				log.Println("error rolling back transaction:", err)
+			}
+		}()
+
+		// Insert into users table
+		usersQuery :=
+			`INSERT INTO users (name, email, email_verified) VALUES ($1, $2, $3)
+			ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+			RETURNING id`
+
+		var userID string
+
+		err = tx.QueryRowContext(r.Context(), usersQuery, claims.Name, claims.Email, claims.EmailVerified).Scan(&userID)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error inserting claims into users:", err)
+			return
+		}
+
+		// Insert into oauth_accounts table
+		oauthAccountsQuery :=
+			`INSERT INTO oauth_accounts (user_id, provider, provider_user_id) VALUES ($1, $2, $3)
+			ON CONFLICT (provider, provider_user_id) DO UPDATE SET provider_user_id = EXCLUDED.provider_user_id`
+
+		_, err = tx.ExecContext(r.Context(), oauthAccountsQuery, userID, "google", claims.Sub)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error inserting claims into oauth_accounts:", err)
+			return
+		}
+
+		// Insert into sessions table
+		sessionsQuery :=
+			`INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`
+
+		_, err = tx.ExecContext(r.Context(), sessionsQuery, userID, tokenHash, expiresAt)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error inserting claims into sessions:", err)
+			return
+		}
+
+		// Commit if nothing wrong
+		err = tx.Commit()
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error commiting transaction:", err)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    token, // raw token to browser
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/",
+			Expires:  expiresAt,
+		})
+
+		http.Redirect(w, r, "http://localhost:5173/", http.StatusFound)
+	}
+}
