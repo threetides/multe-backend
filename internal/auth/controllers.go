@@ -9,7 +9,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os"
+	"strings"
 	"time"
 
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
@@ -20,7 +20,8 @@ import (
 
 func GoogleLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url := AppConfig.AuthCodeURL("randomstate")
+		returnOrigin := r.Header.Get("Referer")
+		url := AppConfig.AuthCodeURL("randomstate|" + returnOrigin)
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	}
 }
@@ -29,7 +30,8 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		queryParams := r.URL.Query()
 		state := queryParams.Get("state")
-		if state != "randomstate" {
+		nonce, returnOrigin, _ := strings.Cut(state, "|")
+		if nonce != "randomstate" {
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
 		}
@@ -173,7 +175,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 			Expires:  expiresAt,
 		})
 
-		http.Redirect(w, r, os.Getenv("CORS_ORIGIN"), http.StatusFound)
+		http.Redirect(w, r, returnOrigin, http.StatusFound)
 	}
 }
 
@@ -181,7 +183,6 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session")
 		if err != nil {
-			log.Println("Error getting cookie:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
 		}
@@ -249,7 +250,6 @@ func (Auth *AuthHandler) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session")
 		if err != nil {
-			log.Println("Error getting cookie:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
 		}

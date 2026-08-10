@@ -16,7 +16,6 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session")
 		if err != nil {
-			log.Println("Error getting cookie:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
 		}

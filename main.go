@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/JonasHaugen/multe_backend/internal/auth"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
@@ -48,7 +49,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{os.Getenv("CORS_ORIGIN")},
+		AllowedOrigins:   strings.Split(os.Getenv("CORS_ORIGIN"), ","),
 		AllowCredentials: true,
 	})
 
