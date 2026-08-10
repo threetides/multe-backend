@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
@@ -172,7 +173,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 			Expires:  expiresAt,
 		})
 
-		http.Redirect(w, r, "http://localhost:5173/", http.StatusFound)
+		http.Redirect(w, r, os.Getenv("CORS_ORIGIN"), http.StatusFound)
 	}
 }
 
