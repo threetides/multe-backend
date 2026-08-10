@@ -188,12 +188,27 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		hash := sha256.Sum256([]byte(cookie.Value))
 		tokenHash := hex.EncodeToString(hash[:])
 
-		query :=
+		// Begin a transaction
+		tx, err := Auth.DB.BeginTx(r.Context(), nil)
+
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error creating transaction:", err)
+			return
+		}
+
+		defer func() {
+			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+				log.Println("error rolling back transaction:", err)
+			}
+		}()
+
+		userIDQuery :=
 			`SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()`
 
 		var userID string
 
-		err = Auth.DB.QueryRowContext(r.Context(), query, tokenHash).Scan(&userID)
+		err = Auth.DB.QueryRowContext(r.Context(), userIDQuery, tokenHash).Scan(&userID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
@@ -205,7 +220,27 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 			return
 		}
 
-		httpx.WriteJSON(w, http.StatusOK, "Authorized", nil)
+		var user User
+
+		userQuery :=
+			`SELECT id, email, name, email_verified, created_at FROM users WHERE id = $1`
+
+		err = Auth.DB.QueryRowContext(r.Context(), userQuery, userID).Scan(&user.ID, &user.Email, &user.Name, &user.EmailVerified, &user.CreatedAt)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			log.Println("Error quering database:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		// Commit if nothing wrong
+		err = tx.Commit()
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error commiting transaction:", err)
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, "Authorized", user)
 	}
 }
 
