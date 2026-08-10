@@ -16,8 +16,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const port = 8080
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -72,6 +70,6 @@ func main() {
 
 	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
 
-	fmt.Println("Server started on port", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), handler))
+	fmt.Println("Server started on port", os.Getenv("PORT"))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", os.Getenv("PORT")), handler))
 }
