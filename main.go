@@ -11,6 +11,7 @@ import (
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/JonasHaugen/multe_backend/internal/test"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 
 	_ "github.com/lib/pq"
 )
@@ -48,6 +49,14 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{os.Getenv("CORS_ORIGIN")},
+		AllowCredentials: true,
+	})
+
+	// Insert the middleware
+	handler := c.Handler(mux)
+
 	// Health
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, "Healthy", nil)
@@ -58,9 +67,11 @@ func main() {
 	// Handlers
 	mux.HandleFunc("GET /api/auth/google/login", auth.GoogleLogin())
 	mux.HandleFunc("GET /api/auth/google/callback", authWithDB.GoogleCallback())
+	mux.HandleFunc("GET /api/auth/session", authWithDB.GetSession())
+	mux.HandleFunc("POST /api/auth/logout", authWithDB.Logout())
 
 	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
 
 	fmt.Println("Server started on port", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), mux))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", port), handler))
 }

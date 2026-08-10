@@ -14,9 +14,6 @@ import (
 
 func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-
 		cookie, err := r.Cookie("session")
 		if err != nil {
 			log.Println("Error getting cookie:", err)

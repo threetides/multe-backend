@@ -175,3 +175,72 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		http.Redirect(w, r, "http://localhost:5173/", http.StatusFound)
 	}
 }
+
+func (Auth *AuthHandler) GetSession() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			log.Println("Error getting cookie:", err)
+			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+
+		hash := sha256.Sum256([]byte(cookie.Value))
+		tokenHash := hex.EncodeToString(hash[:])
+
+		query :=
+			`SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()`
+
+		var userID string
+
+		err = Auth.DB.QueryRowContext(r.Context(), query, tokenHash).Scan(&userID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			log.Println("Error quering database:", err)
+			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+
+		if userID == "" {
+			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, "Authorized", nil)
+	}
+}
+
+func (Auth *AuthHandler) Logout() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session")
+		if err != nil {
+			log.Println("Error getting cookie:", err)
+			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
+			return
+		}
+
+		hash := sha256.Sum256([]byte(cookie.Value))
+		tokenHash := hex.EncodeToString(hash[:])
+
+		query :=
+			`DELETE from sessions WHERE token_hash = $1`
+
+		_, err = Auth.DB.ExecContext(r.Context(), query, tokenHash)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error deleting session:", err)
+			return
+		}
+
+		// Clear cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,              // Tells modern browsers to delete it immediately
+			Expires:  time.Unix(0, 0), // Compatibility fallback for older browsers (e.g., old IE)
+			HttpOnly: true,
+		})
+
+		httpx.WriteJSON(w, http.StatusOK, "Logged out", nil)
+	}
+}
