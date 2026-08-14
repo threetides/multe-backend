@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -279,4 +280,9 @@ func (Auth *AuthHandler) Logout() http.HandlerFunc {
 
 		httpx.WriteJSON(w, http.StatusOK, "Logged out", nil)
 	}
+}
+
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	userID, ok := ctx.Value(userIDKey).(string)
+	return userID, ok
 }

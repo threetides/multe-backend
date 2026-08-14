@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -11,6 +12,10 @@ import (
 
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 )
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
 
 func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +80,9 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		next(w, r)
+		// Create a new context containing the value
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
+
+		next(w, r.WithContext(ctx))
 	}
 }

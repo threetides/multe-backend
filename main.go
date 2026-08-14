@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/JonasHaugen/multe_backend/internal/auth"
+	"github.com/JonasHaugen/multe_backend/internal/collections"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
+	"github.com/JonasHaugen/multe_backend/internal/items"
 	"github.com/JonasHaugen/multe_backend/internal/test"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
@@ -62,6 +64,8 @@ func main() {
 	})
 
 	authWithDB := auth.AuthHandler{DB: db}
+	collectionsWithDB := collections.CollectionsHandler{DB: db}
+	itemsWithDB := items.ItemsHandler{DB: db}
 
 	// Handlers
 	mux.HandleFunc("GET /api/auth/google/login", auth.GoogleLogin())
@@ -70,6 +74,10 @@ func main() {
 	mux.HandleFunc("POST /api/auth/logout", authWithDB.Logout())
 
 	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
+
+	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
+
+	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
 
 	fmt.Println("Server started on port", os.Getenv("PORT"))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", os.Getenv("PORT")), handler))
