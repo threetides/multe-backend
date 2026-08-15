@@ -16,7 +16,7 @@ type Item struct {
 	Name         string          `json:"name"`
 	Status       string          `json:"status"`
 	Price        *float64        `json:"price"`
-	DateBought   string          `json:"dateBought"`
+	DateBought   *string         `json:"dateBought"`
 	Location     string          `json:"location"`
 	Custom       json.RawMessage `json:"custom"`
 	CreatedAt    time.Time       `json:"createdAt"`
