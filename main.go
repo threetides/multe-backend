@@ -76,9 +76,10 @@ func main() {
 	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
 
 	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
-	mux.HandleFunc("GET /api/collection", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
+	mux.HandleFunc("GET /api/collections", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
 
 	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
+	mux.HandleFunc("GET /api/items/{collectionID}", authWithDB.Protected(itemsWithDB.GetItemsFromCollection()))
 
 	fmt.Println("Server started on port", os.Getenv("PORT"))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", os.Getenv("PORT")), handler))

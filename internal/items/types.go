@@ -21,4 +21,5 @@ type Item struct {
 	Location     string          `json:"location"`
 	Custom       json.RawMessage `json:"custom"`
 	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
 }
