@@ -1,7 +1,7 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +13,7 @@ import (
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/JonasHaugen/multe_backend/internal/items"
 	"github.com/JonasHaugen/multe_backend/internal/test"
+	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 
@@ -26,19 +27,18 @@ func main() {
 	}
 
 	// Connect to db
-	db, err := sql.Open("postgres", os.Getenv("DB_CONNECTION_STRING"))
-
+	db, err := pgx.Connect(context.Background(), os.Getenv("DB_CONNECTION_STRING"))
 	if err != nil {
 		log.Fatalln("Error connecting to db:", err)
 	}
 
 	defer func() {
-		if err = db.Close(); err != nil {
+		if err = db.Close(context.Background()); err != nil {
 			log.Fatalln("Error closing db connection:", err)
 		}
 	}()
 
-	err = db.Ping()
+	err = db.Ping(context.Background())
 
 	if err != nil {
 		log.Fatalln("Error pinging db:", err)
@@ -76,6 +76,7 @@ func main() {
 	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
 
 	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
+	mux.HandleFunc("GET /api/collection", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
 
 	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
 

@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/JonasHaugen/multe_backend/internal/auth"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
@@ -53,11 +52,7 @@ func (i *ItemsHandler) CreateItem() http.HandlerFunc {
 		if price != nil && *price < 0 {
 			errors = append(errors, httpx.FieldError{Field: "price", Message: "'price' must be a positive number"})
 		}
-		if item.DateBought != nil {
-			if _, err = time.Parse("2006-01-02", *dateBought); err != nil {
-				errors = append(errors, httpx.FieldError{Field: "dateBought", Message: "'dateBought' must be follow this structure: 2006-01-02"})
-			}
-		}
+
 		if len(location) > 255 {
 			errors = append(errors, httpx.FieldError{Field: "location", Message: "'location' can't contain more than 255 characters"})
 		}
@@ -80,7 +75,7 @@ func (i *ItemsHandler) CreateItem() http.HandlerFunc {
 
 		var collectionUserID string
 
-		_ = i.DB.QueryRowContext(r.Context(), collectionQuery, collectionID, userID).Scan(&collectionUserID)
+		_ = i.DB.QueryRow(r.Context(), collectionQuery, collectionID, userID).Scan(&collectionUserID)
 
 		if collectionUserID == "" {
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
@@ -93,7 +88,7 @@ func (i *ItemsHandler) CreateItem() http.HandlerFunc {
 
 		var inserted Item
 
-		err = i.DB.QueryRowContext(r.Context(), itemQuery, collectionID, name, status, price, dateBought, location, custom).Scan(&inserted.ID, &inserted.CollectionID, &inserted.Name, &inserted.Status, &inserted.Price, &inserted.DateBought, &inserted.Location, &inserted.Custom, &inserted.CreatedAt)
+		err = i.DB.QueryRow(r.Context(), itemQuery, collectionID, name, status, price, dateBought, location, custom).Scan(&inserted.ID, &inserted.CollectionID, &inserted.Name, &inserted.Status, &inserted.Price, &inserted.DateBought, &inserted.Location, &inserted.Custom, &inserted.CreatedAt)
 
 		if err != nil {
 			log.Println("Error inserting into items table:", err)

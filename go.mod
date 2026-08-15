@@ -14,10 +14,16 @@ require (
 	github.com/rs/cors v1.11.1
 )
 
-require github.com/rivo/uniseg v0.4.7 // indirect
+require (
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
+	golang.org/x/text v0.29.0 // indirect
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/lib/pq v1.12.3
 )

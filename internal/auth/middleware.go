@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"log"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
+	"github.com/jackc/pgx/v5"
 )
 
 type contextKey string
@@ -30,7 +30,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		expiresAt := time.Now().AddDate(0, 0, 30)
 
 		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), nil)
+		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
 
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -39,7 +39,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		defer func() {
-			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Println("error rolling back transaction:", err)
 			}
 		}()
@@ -49,8 +49,8 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 
 		var userID string
 
-		err = Auth.DB.QueryRowContext(r.Context(), userIDQuery, tokenHash).Scan(&userID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		err = Auth.DB.QueryRow(r.Context(), userIDQuery, tokenHash).Scan(&userID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
@@ -65,7 +65,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		expiresAtQuery :=
 			`UPDATE sessions SET expires_at = $1 WHERE token_hash = $2;`
 
-		_, err = Auth.DB.ExecContext(r.Context(), expiresAtQuery, expiresAt, tokenHash)
+		_, err = Auth.DB.Exec(r.Context(), expiresAtQuery, expiresAt, tokenHash)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error shifting expires_at:", err)
@@ -73,7 +73,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Commit if nothing wrong
-		err = tx.Commit()
+		err = tx.Commit(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error commiting transaction:", err)

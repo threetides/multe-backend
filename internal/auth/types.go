@@ -1,12 +1,13 @@
 package auth
 
 import (
-	"database/sql"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type AuthHandler struct {
-	DB *sql.DB
+	DB *pgx.Conn
 }
 
 type User struct {

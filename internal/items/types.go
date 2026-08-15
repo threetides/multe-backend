@@ -1,13 +1,14 @@
 package items
 
 import (
-	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type ItemsHandler struct {
-	DB *sql.DB
+	DB *pgx.Conn
 }
 
 type Item struct {
@@ -16,7 +17,7 @@ type Item struct {
 	Name         string          `json:"name"`
 	Status       string          `json:"status"`
 	Price        *float64        `json:"price"`
-	DateBought   *string         `json:"dateBought"`
+	DateBought   *time.Time      `json:"dateBought"`
 	Location     string          `json:"location"`
 	Custom       json.RawMessage `json:"custom"`
 	CreatedAt    time.Time       `json:"createdAt"`

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/jackc/pgx/v5"
 
 	"golang.org/x/oauth2"
 )
@@ -107,7 +107,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		expiresAt := time.Now().AddDate(0, 0, 30)
 
 		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), nil)
+		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error creating transaction:", err)
@@ -115,7 +115,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		}
 
 		defer func() {
-			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Println("error rolling back transaction:", err)
 			}
 		}()
@@ -128,7 +128,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 
 		var userID string
 
-		err = tx.QueryRowContext(r.Context(), usersQuery, claims.Name, claims.Email, claims.EmailVerified).Scan(&userID)
+		err = tx.QueryRow(r.Context(), usersQuery, claims.Name, claims.Email, claims.EmailVerified).Scan(&userID)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error inserting claims into users:", err)
@@ -140,7 +140,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 			`INSERT INTO oauth_accounts (user_id, provider, provider_user_id) VALUES ($1, $2, $3)
 			ON CONFLICT (provider, provider_user_id) DO UPDATE SET provider_user_id = EXCLUDED.provider_user_id`
 
-		_, err = tx.ExecContext(r.Context(), oauthAccountsQuery, userID, "google", claims.Sub)
+		_, err = tx.Exec(r.Context(), oauthAccountsQuery, userID, "google", claims.Sub)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error inserting claims into oauth_accounts:", err)
@@ -151,7 +151,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		sessionsQuery :=
 			`INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`
 
-		_, err = tx.ExecContext(r.Context(), sessionsQuery, userID, tokenHash, expiresAt)
+		_, err = tx.Exec(r.Context(), sessionsQuery, userID, tokenHash, expiresAt)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error inserting claims into sessions:", err)
@@ -159,7 +159,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		}
 
 		// Commit if nothing wrong
-		err = tx.Commit()
+		err = tx.Commit(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error commiting transaction:", err)
@@ -192,7 +192,7 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		tokenHash := hex.EncodeToString(hash[:])
 
 		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), nil)
+		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
 
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -201,7 +201,7 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		}
 
 		defer func() {
-			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Println("error rolling back transaction:", err)
 			}
 		}()
@@ -211,8 +211,8 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 
 		var userID string
 
-		err = Auth.DB.QueryRowContext(r.Context(), userIDQuery, tokenHash).Scan(&userID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		err = Auth.DB.QueryRow(r.Context(), userIDQuery, tokenHash).Scan(&userID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
@@ -228,15 +228,15 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		userQuery :=
 			`SELECT id, email, name, email_verified, created_at FROM users WHERE id = $1`
 
-		err = Auth.DB.QueryRowContext(r.Context(), userQuery, userID).Scan(&user.ID, &user.Email, &user.Name, &user.EmailVerified, &user.CreatedAt)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		err = Auth.DB.QueryRow(r.Context(), userQuery, userID).Scan(&user.ID, &user.Email, &user.Name, &user.EmailVerified, &user.CreatedAt)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			return
 		}
 
 		// Commit if nothing wrong
-		err = tx.Commit()
+		err = tx.Commit(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error commiting transaction:", err)
@@ -261,7 +261,7 @@ func (Auth *AuthHandler) Logout() http.HandlerFunc {
 		query :=
 			`DELETE from sessions WHERE token_hash = $1`
 
-		_, err = Auth.DB.ExecContext(r.Context(), query, tokenHash)
+		_, err = Auth.DB.Exec(r.Context(), query, tokenHash)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error deleting session:", err)
