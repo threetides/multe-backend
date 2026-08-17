@@ -56,7 +56,7 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 				} else if len(label) > 255 {
 					fieldErrors = append(fieldErrors, httpx.FieldError{Field: "label", Message: "'label' can't contain more than 255 characters"})
 				}
-				if fType == "text" || fType != "number" {
+				if fType == "text" && fType != "number" {
 					fieldErrors = append(fieldErrors, httpx.FieldError{Field: "type", Message: "'type' must be either 'text' or 'number'"})
 				}
 			}
