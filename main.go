@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/JonasHaugen/multe_backend/internal/auth"
-	"github.com/JonasHaugen/multe_backend/internal/collectionfields"
 	"github.com/JonasHaugen/multe_backend/internal/collections"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/JonasHaugen/multe_backend/internal/items"
@@ -61,7 +60,6 @@ func main() {
 	authWithDB := auth.AuthHandler{DB: db}
 	collectionsWithDB := collections.CollectionsHandler{DB: db}
 	itemsWithDB := items.ItemsHandler{DB: db}
-	collectionFieldsWithDB := collectionfields.CollectionFieldsHandler{DB: db}
 
 	// Handlers
 	mux.HandleFunc("GET /api/auth/google/login", auth.GoogleLogin())
@@ -73,8 +71,6 @@ func main() {
 
 	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
 	mux.HandleFunc("GET /api/collections", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
-
-	mux.HandleFunc("POST /api/collection-field", authWithDB.Protected(collectionFieldsWithDB.CreateCollectionField()))
 
 	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
 	mux.HandleFunc("GET /api/items", authWithDB.Protected(itemsWithDB.GetAllItems()))

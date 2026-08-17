@@ -36,7 +36,6 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 			log.Println("error creating transaction:", err)
 			return
 		}
-
 		defer func() {
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				log.Println("error rolling back transaction:", err)
