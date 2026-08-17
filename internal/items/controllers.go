@@ -146,6 +146,38 @@ func (i *ItemsHandler) GetItemsFromCollection() http.HandlerFunc {
 			return
 		}
 
-		httpx.WriteJSON(w, http.StatusOK, "Collections found", items)
+		httpx.WriteJSON(w, http.StatusOK, "Items found", items)
+	}
+}
+
+func (i *ItemsHandler) GetAllItems() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			log.Println("Error getting userID from context")
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		query :=
+			`SELECT items.id, items.collection_id, items.name, items.status, items.price, items.date_bought, items.location, items.custom, items.created_at, items.updated_at FROM items
+			JOIN collections ON collections.id = items.collection_id
+			WHERE collections.user_id = $1;`
+
+		rows, err := i.DB.Query(r.Context(), query, userID)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		items, err := pgx.CollectRows(rows, pgx.RowToStructByName[Item])
+		if err != nil {
+			log.Println("Error scanning into items:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, "Items found", items)
 	}
 }

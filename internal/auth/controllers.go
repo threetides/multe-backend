@@ -107,7 +107,7 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		expiresAt := time.Now().AddDate(0, 0, 30)
 
 		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
+		tx, err := Auth.DB.Begin(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error creating transaction:", err)
@@ -191,21 +191,6 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		hash := sha256.Sum256([]byte(cookie.Value))
 		tokenHash := hex.EncodeToString(hash[:])
 
-		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
-
-		if err != nil {
-			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
-			log.Println("error creating transaction:", err)
-			return
-		}
-
-		defer func() {
-			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-				log.Println("error rolling back transaction:", err)
-			}
-		}()
-
 		userIDQuery :=
 			`SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > now()`
 
@@ -232,14 +217,6 @@ func (Auth *AuthHandler) GetSession() http.HandlerFunc {
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
-			return
-		}
-
-		// Commit if nothing wrong
-		err = tx.Commit(r.Context())
-		if err != nil {
-			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
-			log.Println("error commiting transaction:", err)
 			return
 		}
 

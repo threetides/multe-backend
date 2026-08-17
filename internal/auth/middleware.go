@@ -30,8 +30,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		expiresAt := time.Now().AddDate(0, 0, 30)
 
 		// Begin a transaction
-		tx, err := Auth.DB.BeginTx(r.Context(), pgx.TxOptions{})
-
+		tx, err := Auth.DB.Begin(r.Context())
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error creating transaction:", err)
@@ -49,7 +48,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 
 		var userID string
 
-		err = Auth.DB.QueryRow(r.Context(), userIDQuery, tokenHash).Scan(&userID)
+		err = tx.QueryRow(r.Context(), userIDQuery, tokenHash).Scan(&userID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Error quering database:", err)
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
@@ -65,7 +64,7 @@ func (Auth *AuthHandler) Protected(next http.HandlerFunc) http.HandlerFunc {
 		expiresAtQuery :=
 			`UPDATE sessions SET expires_at = $1 WHERE token_hash = $2;`
 
-		_, err = Auth.DB.Exec(r.Context(), expiresAtQuery, expiresAt, tokenHash)
+		_, err = tx.Exec(r.Context(), expiresAtQuery, expiresAt, tokenHash)
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			log.Println("error shifting expires_at:", err)

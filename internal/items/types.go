@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ItemsHandler struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
 type Item struct {

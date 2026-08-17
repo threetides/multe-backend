@@ -3,11 +3,11 @@ package collections
 import (
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CollectionsHandler struct {
-	DB *pgx.Conn
+	DB *pgxpool.Pool
 }
 
 type Collection struct {
