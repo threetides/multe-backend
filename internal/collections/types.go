@@ -11,9 +11,11 @@ type CollectionsHandler struct {
 }
 
 type CollectionField struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Type  string `json:"type"`
+	Key      string `json:"key"`
+	Label    string `json:"label"`
+	Type     string `json:"type"`
+	Unit     string `json:"unit"`
+	Position int    `json:"position"`
 }
 
 type Collection struct {

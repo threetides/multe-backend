@@ -50,6 +50,7 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 			for _, field := range *collection.CollectionFields {
 				label := strings.TrimSpace(field.Label)
 				fType := strings.TrimSpace(strings.ToLower(field.Type))
+				unit := strings.TrimSpace(field.Unit)
 
 				if label == "" {
 					fieldErrors = append(fieldErrors, httpx.FieldError{Field: "label", Message: "'label' is required"})
@@ -58,6 +59,9 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 				}
 				if fType != "text" && fType != "number" {
 					fieldErrors = append(fieldErrors, httpx.FieldError{Field: "type", Message: "'type' must be either 'text' or 'number'"})
+				}
+				if len(unit) > 255 {
+					fieldErrors = append(fieldErrors, httpx.FieldError{Field: "unit", Message: "'unit' can't contain more than 255 characters"})
 				}
 			}
 		}
@@ -98,15 +102,17 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 				key := strings.ReplaceAll(strings.TrimSpace(strings.ToLower(c.Label)), " ", "_")
 				label := strings.TrimSpace(c.Label)
 				fType := strings.TrimSpace(strings.ToLower(c.Type))
+				unit := strings.TrimSpace(c.Unit)
+				position := c.Position
 
-				rows = append(rows, []any{collectionID, key, label, fType})
+				rows = append(rows, []any{collectionID, key, label, fType, unit, position})
 			}
 
 			_, err = tx.CopyFrom(
 				r.Context(),
-				pgx.Identifier{"collection_fields"},               // Table name
-				[]string{"collection_id", "key", "label", "type"}, // Target columns
-				pgx.CopyFromRows(rows),                            // Data source
+				pgx.Identifier{"collection_fields"}, // Table name
+				[]string{"collection_id", "key", "label", "type", "unit", "position"}, // Target columns
+				pgx.CopyFromRows(rows), // Data source
 			)
 
 			if err != nil {
