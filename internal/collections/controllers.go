@@ -9,6 +9,7 @@ import (
 
 	"github.com/JonasHaugen/multe_backend/internal/auth"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
+	"github.com/JonasHaugen/multe_backend/internal/items"
 	"github.com/forPelevin/gomoji"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -47,7 +48,7 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 		}
 
 		if collection.CollectionFields != nil {
-			for _, field := range *collection.CollectionFields {
+			for _, field := range collection.CollectionFields {
 				label := strings.TrimSpace(field.Label)
 				fType := strings.TrimSpace(strings.ToLower(field.Type))
 				unit := strings.TrimSpace(field.Unit)
@@ -96,9 +97,9 @@ func (c *CollectionsHandler) CreateCollection() http.HandlerFunc {
 			return
 		}
 
-		if collection.CollectionFields != nil && len(*collection.CollectionFields) > 0 {
+		if len(collection.CollectionFields) > 0 {
 			rows := [][]any{}
-			for _, c := range *collection.CollectionFields {
+			for _, c := range collection.CollectionFields {
 				key := strings.ReplaceAll(strings.TrimSpace(strings.ToLower(c.Label)), " ", "_")
 				label := strings.TrimSpace(c.Label)
 				fType := strings.TrimSpace(strings.ToLower(c.Type))
@@ -148,23 +149,161 @@ func (c *CollectionsHandler) GetAllCollections() http.HandlerFunc {
 			return
 		}
 
-		query :=
+		// Begin a transaction
+		tx, err := c.DB.Begin(r.Context())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error creating transaction:", err)
+			return
+		}
+		defer func() {
+			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+				log.Println("error rolling back transaction:", err)
+			}
+		}()
+
+		collectionQuery :=
 			`SELECT id, user_id, name, emoji, created_at, updated_at FROM collections WHERE user_id = $1`
 
-		rows, err := c.DB.Query(r.Context(), query, userID)
+		collectionRows, err := c.DB.Query(r.Context(), collectionQuery, userID)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			return
 		}
 
-		collections, err := pgx.CollectRows(rows, pgx.RowToStructByName[Collection])
+		collections, err := pgx.CollectRows(collectionRows, pgx.RowToStructByName[Collection])
 		if err != nil {
 			log.Println("Error scanning into collection:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			return
 		}
 
+		var ids []string
+
+		for _, c := range collections {
+			ids = append(ids, c.ID)
+		}
+
+		collectionFieldQuery :=
+			`SELECT id, collection_id, key, label, type, unit, position, created_at, updated_at FROM collection_fields WHERE collection_id = ANY($1) ORDER BY position`
+
+		collectionFieldRows, err := c.DB.Query(r.Context(), collectionFieldQuery, ids)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collectionFields, err := pgx.CollectRows(collectionFieldRows, pgx.RowToStructByName[CollectionField])
+		if err != nil {
+			log.Println("Error scanning into collection:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		for i := range collections {
+			for _, cf := range collectionFields {
+				if cf.CollectionID == collections[i].ID {
+					collections[i].CollectionFields = append(collections[i].CollectionFields, cf)
+				}
+			}
+		}
+
+		// Commit if nothing wrong
+		err = tx.Commit(r.Context())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error commiting transaction:", err)
+			return
+		}
+
 		httpx.WriteJSON(w, http.StatusOK, "Collections found", collections)
+	}
+}
+
+func (c *CollectionsHandler) GetCollectionByID() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			log.Println("Error getting userID from context")
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collectionID := r.PathValue("collectionID")
+
+		// Begin a transaction
+		tx, err := c.DB.Begin(r.Context())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error creating transaction:", err)
+			return
+		}
+		defer func() {
+			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+				log.Println("error rolling back transaction:", err)
+			}
+		}()
+
+		collectionQuery :=
+			`SELECT id, user_id, name, emoji, created_at, updated_at FROM collections WHERE user_id = $1 AND id = $2`
+
+		var collection Collection
+
+		err = c.DB.QueryRow(r.Context(), collectionQuery, userID, collectionID).Scan(&collection.ID, &collection.UserID, &collection.Name, &collection.Emoji, &collection.CreatedAt, &collection.UpdatedAt)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collectionFieldQuery :=
+			`SELECT id, collection_id, key, label, type, unit, position, created_at, updated_at FROM collection_fields WHERE collection_id = $1 ORDER BY position`
+
+		collectionFieldRows, err := c.DB.Query(r.Context(), collectionFieldQuery, collectionID)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collectionFields, err := pgx.CollectRows(collectionFieldRows, pgx.RowToStructByName[CollectionField])
+		if err != nil {
+			log.Println("Error scanning into collectionFields:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collection.CollectionFields = collectionFields
+
+		itemsQuery :=
+			`SELECT id, collection_id, name, status, price, date_bought, location, custom, created_at, updated_at FROM items WHERE collection_id = $1`
+
+		itemRows, err := c.DB.Query(r.Context(), itemsQuery, collectionID)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		items, err := pgx.CollectRows(itemRows, pgx.RowToStructByName[items.Item])
+		if err != nil {
+			log.Println("Error scanning into items:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		collection.Items = items
+
+		// Commit if nothing wrong
+		err = tx.Commit(r.Context())
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error commiting transaction:", err)
+			return
+		}
+
+		httpx.WriteJSON(w, http.StatusOK, "Collections found", collection)
 	}
 }

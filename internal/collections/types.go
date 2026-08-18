@@ -3,6 +3,7 @@ package collections
 import (
 	"time"
 
+	"github.com/JonasHaugen/multe_backend/internal/items"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -11,19 +12,24 @@ type CollectionsHandler struct {
 }
 
 type CollectionField struct {
-	Key      string `json:"key"`
-	Label    string `json:"label"`
-	Type     string `json:"type"`
-	Unit     string `json:"unit"`
-	Position int    `json:"position"`
+	ID           string    `json:"id"`
+	CollectionID string    `json:"collectionID"`
+	Key          string    `json:"key"`
+	Label        string    `json:"label"`
+	Type         string    `json:"type"`
+	Unit         string    `json:"unit"`
+	Position     int       `json:"position"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 type Collection struct {
-	ID               string             `json:"id"`
-	UserID           string             `json:"userID"`
-	Name             string             `json:"name"`
-	Emoji            string             `json:"emoji"`
-	CreatedAt        time.Time          `json:"createdAt"`
-	UpdatedAt        time.Time          `json:"updatedAt"`
-	CollectionFields *[]CollectionField `json:"collectionFields" db:"-"`
+	ID               string            `json:"id"`
+	UserID           string            `json:"userID"`
+	Name             string            `json:"name"`
+	Emoji            string            `json:"emoji"`
+	CollectionFields []CollectionField `json:"collectionFields" db:"-"`
+	Items            []items.Item      `json:"items" db:"-"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	UpdatedAt        time.Time         `json:"updatedAt"`
 }

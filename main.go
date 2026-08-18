@@ -71,6 +71,7 @@ func main() {
 
 	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
 	mux.HandleFunc("GET /api/collections", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
+	mux.HandleFunc("GET /api/collection/{collectionID}", authWithDB.Protected(collectionsWithDB.GetCollectionByID()))
 
 	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
 	mux.HandleFunc("GET /api/items", authWithDB.Protected(itemsWithDB.GetAllItems()))
