@@ -20,6 +20,9 @@
 # !Makefile
 !makefile
 
+# !sql
+!sql
+
 # !yaml or !yml
 !*.yaml
 !*.yml
