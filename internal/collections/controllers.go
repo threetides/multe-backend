@@ -165,7 +165,7 @@ func (c *CollectionsHandler) GetAllCollections() http.HandlerFunc {
 		collectionQuery :=
 			`SELECT id, user_id, name, emoji, created_at, updated_at FROM collections WHERE user_id = $1`
 
-		collectionRows, err := c.DB.Query(r.Context(), collectionQuery, userID)
+		collectionRows, err := tx.Query(r.Context(), collectionQuery, userID)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -188,7 +188,7 @@ func (c *CollectionsHandler) GetAllCollections() http.HandlerFunc {
 		collectionFieldQuery :=
 			`SELECT id, collection_id, key, label, type, unit, position, created_at, updated_at FROM collection_fields WHERE collection_id = ANY($1) ORDER BY position`
 
-		collectionFieldRows, err := c.DB.Query(r.Context(), collectionFieldQuery, ids)
+		collectionFieldRows, err := tx.Query(r.Context(), collectionFieldQuery, ids)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -202,10 +202,32 @@ func (c *CollectionsHandler) GetAllCollections() http.HandlerFunc {
 			return
 		}
 
+		itemsQuery :=
+			`SELECT id, collection_id, name, status, price, date_bought, location, custom, created_at, updated_at FROM items`
+
+		itemRows, err := tx.Query(r.Context(), itemsQuery)
+		if err != nil {
+			log.Println("Error doing query:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
+		items, err := pgx.CollectRows(itemRows, pgx.RowToStructByName[items.Item])
+		if err != nil {
+			log.Println("Error scanning into items:", err)
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			return
+		}
+
 		for i := range collections {
 			for _, cf := range collectionFields {
 				if cf.CollectionID == collections[i].ID {
 					collections[i].CollectionFields = append(collections[i].CollectionFields, cf)
+				}
+			}
+			for _, item := range items {
+				if item.CollectionID == collections[i].ID {
+					collections[i].Items = append(collections[i].Items, item)
 				}
 			}
 		}
@@ -251,7 +273,7 @@ func (c *CollectionsHandler) GetCollectionByID() http.HandlerFunc {
 
 		var collection Collection
 
-		err = c.DB.QueryRow(r.Context(), collectionQuery, userID, collectionID).Scan(&collection.ID, &collection.UserID, &collection.Name, &collection.Emoji, &collection.CreatedAt, &collection.UpdatedAt)
+		err = tx.QueryRow(r.Context(), collectionQuery, userID, collectionID).Scan(&collection.ID, &collection.UserID, &collection.Name, &collection.Emoji, &collection.CreatedAt, &collection.UpdatedAt)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -261,7 +283,7 @@ func (c *CollectionsHandler) GetCollectionByID() http.HandlerFunc {
 		collectionFieldQuery :=
 			`SELECT id, collection_id, key, label, type, unit, position, created_at, updated_at FROM collection_fields WHERE collection_id = $1 ORDER BY position`
 
-		collectionFieldRows, err := c.DB.Query(r.Context(), collectionFieldQuery, collectionID)
+		collectionFieldRows, err := tx.Query(r.Context(), collectionFieldQuery, collectionID)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -280,7 +302,7 @@ func (c *CollectionsHandler) GetCollectionByID() http.HandlerFunc {
 		itemsQuery :=
 			`SELECT id, collection_id, name, status, price, date_bought, location, custom, created_at, updated_at FROM items WHERE collection_id = $1`
 
-		itemRows, err := c.DB.Query(r.Context(), itemsQuery, collectionID)
+		itemRows, err := tx.Query(r.Context(), itemsQuery, collectionID)
 		if err != nil {
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
