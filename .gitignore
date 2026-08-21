@@ -21,7 +21,7 @@
 !makefile
 
 # !sql
-!sql
+!*.sql
 
 # !yaml or !yml
 !*.yaml
