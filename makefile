@@ -1,5 +1,6 @@
+-include .env
+
 APP     := multe_backend
-SERVER  := jonas@178.105.165.141
 BIN     := bin/$(APP)
 
 dev: 

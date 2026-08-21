@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -21,9 +22,29 @@ import (
 
 func GoogleLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		returnOrigin := r.Header.Get("Referer")
-		url := AppConfig.AuthCodeURL("randomstate|" + returnOrigin)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error generating oauth state:", err)
+			return
+		}
+		nonce := base64.RawURLEncoding.EncodeToString(b)
+
+		// The callback verifies the state against this cookie to ensure the
+		// flow was started by this browser (CSRF protection).
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth_state",
+			Value:    nonce,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/api/auth/google/callback",
+			MaxAge:   600,
+		})
+
+		returnOrigin := validateReturnOrigin(r.Header.Get("Referer"))
+		authURL := AppConfig.AuthCodeURL(nonce + "|" + returnOrigin)
+		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 	}
 }
 
@@ -32,10 +53,26 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		queryParams := r.URL.Query()
 		state := queryParams.Get("state")
 		nonce, returnOrigin, _ := strings.Cut(state, "|")
-		if nonce != "randomstate" {
+
+		stateCookie, err := r.Cookie("oauth_state")
+		if err != nil || nonce == "" ||
+			subtle.ConstantTimeCompare([]byte(nonce), []byte(stateCookie.Value)) != 1 {
 			httpx.WriteJSON(w, http.StatusUnauthorized, "Unauthorized", nil)
 			return
 		}
+
+		// The state is single-use; clear it now that it has been verified.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth_state",
+			Value:    "",
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/api/auth/google/callback",
+			MaxAge:   -1,
+		})
+
+		returnOrigin = validateReturnOrigin(returnOrigin)
 
 		code := queryParams.Get("code")
 
@@ -100,7 +137,12 @@ func (Auth *AuthHandler) GoogleCallback() http.HandlerFunc {
 		}
 
 		b := make([]byte, 32)
-		rand.Read(b)
+		_, err = rand.Read(b)
+		if err != nil {
+			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
+			log.Println("error reading byte:", err)
+			return
+		}
 		token := base64.RawURLEncoding.EncodeToString(b)
 		hash := sha256.Sum256([]byte(token))
 		tokenHash := hex.EncodeToString(hash[:])

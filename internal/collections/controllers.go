@@ -275,6 +275,11 @@ func (c *CollectionsHandler) GetCollectionByID() http.HandlerFunc {
 
 		err = tx.QueryRow(r.Context(), collectionQuery, userID, collectionID).Scan(&collection.ID, &collection.UserID, &collection.Name, &collection.Emoji, &collection.CreatedAt, &collection.UpdatedAt)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				log.Println("Error doing query:", err)
+				httpx.WriteJSON(w, http.StatusNotFound, "Collection not found", nil)
+				return
+			}
 			log.Println("Error doing query:", err)
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
 			return
