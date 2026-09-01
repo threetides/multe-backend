@@ -135,6 +135,8 @@ github.com/threetides/tideauth v1.2.0 h1:tiL5MkQmRl8W/QNVVG/9gGXTVu5sUkYK80HQQJ/
 github.com/threetides/tideauth v1.2.0/go.mod h1:Ersv6D5TCa96D85GtKlETfJffUs0pb0YzF6TYb5OCtc=
 github.com/threetides/tideauth v1.3.0 h1:+dWTo8M6xuXbo1oKgH/nF3w9+e2vYF6rYA+kb6mA8LY=
 github.com/threetides/tideauth v1.3.0/go.mod h1:Ersv6D5TCa96D85GtKlETfJffUs0pb0YzF6TYb5OCtc=
+github.com/threetides/tideauth v1.3.1 h1:YVeBQZeBYOBBCH5QqgVNKDXJ5ZNrRx0k/Mc/1BAvt6E=
+github.com/threetides/tideauth v1.3.1/go.mod h1:Ersv6D5TCa96D85GtKlETfJffUs0pb0YzF6TYb5OCtc=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
