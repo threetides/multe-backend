@@ -76,7 +76,7 @@ func main() {
 	// Create default routes exported by tideauth
 	routes, err := auth.Routes()
 	if err != nil {
-		log.Fatalln("Error creating routes:", err)
+		log.Fatalln("Error setting up routes:", err)
 	}
 
 	collectionsHandler := collections.CollectionsHandler{DB: db, Auth: auth}

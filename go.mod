@@ -3,18 +3,17 @@ module github.com/JonasHaugen/multe_backend
 go 1.27.0
 
 require (
-	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/forPelevin/gomoji v1.4.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/cors v1.11.1
-	golang.org/x/oauth2 v0.36.0
+	github.com/threetides/tideauth v1.3.1
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.8.0 // indirect
 	github.com/AfterShip/email-verifier v1.4.1 // indirect
+	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/golang-migrate/migrate/v4 v4.19.1 // indirect
 	github.com/hbollon/go-edlib v1.6.0 // indirect
@@ -30,9 +29,9 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/threetides/tideauth v1.3.1 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
