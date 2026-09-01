@@ -8,14 +8,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/JonasHaugen/multe_backend/internal/auth"
 	"github.com/JonasHaugen/multe_backend/internal/collections"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/JonasHaugen/multe_backend/internal/items"
-	"github.com/JonasHaugen/multe_backend/internal/test"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
+	"github.com/threetides/tideauth"
 )
 
 func main() {
@@ -40,8 +39,6 @@ func main() {
 
 	fmt.Println("Connected to db")
 
-	auth.GoogleConfig()
-
 	mux := http.NewServeMux()
 
 	c := cors.New(cors.Options{
@@ -57,25 +54,44 @@ func main() {
 		httpx.WriteJSON(w, http.StatusOK, "Healthy", nil)
 	})
 
-	authWithDB := auth.AuthHandler{DB: db}
-	collectionsWithDB := collections.CollectionsHandler{DB: db}
-	itemsWithDB := items.ItemsHandler{DB: db}
+	// Create config for tideauth
+	cfg := tideauth.Config{
+		DB:           db,
+		CookieDomain: os.Getenv("CORS_ORIGIN"),
+		Google: tideauth.Google{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("REDIRECT_URL") + "/api/auth/google/callback",
+		},
+	}
+
+	auth := tideauth.New(cfg)
+
+	// Run migrations
+	err = auth.Migrate(context.Background())
+	if err != nil {
+		log.Fatalln("Error running migrations:", err)
+	}
+
+	// Create default routes exported by tideauth
+	routes, err := auth.Routes()
+	if err != nil {
+		log.Fatalln("Error creating routes:", err)
+	}
+
+	collectionsHandler := collections.CollectionsHandler{DB: db, Auth: auth}
+	itemsHandler := items.ItemsHandler{DB: db, Auth: auth}
 
 	// Handlers
-	mux.HandleFunc("GET /api/auth/google/login", auth.GoogleLogin())
-	mux.HandleFunc("GET /api/auth/google/callback", authWithDB.GoogleCallback())
-	mux.HandleFunc("GET /api/auth/session", authWithDB.GetSession())
-	mux.HandleFunc("POST /api/auth/logout", authWithDB.Logout())
+	mux.Handle("/api/auth/", http.StripPrefix("/api/auth", routes))
 
-	mux.HandleFunc("GET /api/test", authWithDB.Protected(test.Test()))
+	mux.HandleFunc("POST /api/collection", auth.Protected(collectionsHandler.CreateCollection()))
+	mux.HandleFunc("GET /api/collections", auth.Protected(collectionsHandler.GetAllCollections()))
+	mux.HandleFunc("GET /api/collection/{collectionID}", auth.Protected(collectionsHandler.GetCollectionByID()))
 
-	mux.HandleFunc("POST /api/collection", authWithDB.Protected(collectionsWithDB.CreateCollection()))
-	mux.HandleFunc("GET /api/collections", authWithDB.Protected(collectionsWithDB.GetAllCollections()))
-	mux.HandleFunc("GET /api/collection/{collectionID}", authWithDB.Protected(collectionsWithDB.GetCollectionByID()))
-
-	mux.HandleFunc("POST /api/item", authWithDB.Protected(itemsWithDB.CreateItem()))
-	mux.HandleFunc("GET /api/items", authWithDB.Protected(itemsWithDB.GetAllItems()))
-	mux.HandleFunc("GET /api/items/{collectionID}", authWithDB.Protected(itemsWithDB.GetItemsFromCollection()))
+	mux.HandleFunc("POST /api/item", auth.Protected(itemsHandler.CreateItem()))
+	mux.HandleFunc("GET /api/items", auth.Protected(itemsHandler.GetAllItems()))
+	mux.HandleFunc("GET /api/items/{collectionID}", auth.Protected(itemsHandler.GetItemsFromCollection()))
 
 	fmt.Println("Server started on port", os.Getenv("PORT"))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("127.0.0.1:%v", os.Getenv("PORT")), handler))

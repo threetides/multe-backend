@@ -5,10 +5,12 @@ import (
 
 	"github.com/JonasHaugen/multe_backend/internal/items"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/threetides/tideauth"
 )
 
 type CollectionsHandler struct {
-	DB *pgxpool.Pool
+	DB   *pgxpool.Pool
+	Auth *tideauth.Auth
 }
 
 type CollectionField struct {

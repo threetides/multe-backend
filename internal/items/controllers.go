@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JonasHaugen/multe_backend/internal/auth"
 	"github.com/JonasHaugen/multe_backend/internal/httpx"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,7 +15,7 @@ func (i *ItemsHandler) CreateItem() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var errors []httpx.FieldError
 
-		userID, ok := auth.UserIDFromContext(r.Context())
+		userID, ok := i.Auth.UserIDFromContext(r.Context())
 		if !ok {
 			log.Println("Error getting userID from context")
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -105,7 +104,7 @@ func (i *ItemsHandler) CreateItem() http.HandlerFunc {
 func (i *ItemsHandler) GetItemsFromCollection() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collectionID := r.PathValue("collectionID")
-		userID, ok := auth.UserIDFromContext(r.Context())
+		userID, ok := i.Auth.UserIDFromContext(r.Context())
 		if !ok {
 			log.Println("Error getting userID from context")
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)
@@ -152,7 +151,7 @@ func (i *ItemsHandler) GetItemsFromCollection() http.HandlerFunc {
 
 func (i *ItemsHandler) GetAllItems() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := auth.UserIDFromContext(r.Context())
+		userID, ok := i.Auth.UserIDFromContext(r.Context())
 		if !ok {
 			log.Println("Error getting userID from context")
 			httpx.WriteJSON(w, http.StatusInternalServerError, "Internal server error", nil)

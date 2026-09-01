@@ -4,7 +4,9 @@ APP     := multe_backend
 BIN     := bin/$(APP)
 
 dev: 
-	golangci-lint run && go run main.go
+	go run main.go
+lint:
+	golangci-lint run
 
 deploy:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v3 \
