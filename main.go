@@ -56,8 +56,10 @@ func main() {
 
 	// Create config for tideauth
 	cfg := tideauth.Config{
-		DB:           db,
-		CookieDomain: os.Getenv("CORS_ORIGIN"),
+		DB:             db,
+		RedirectOrigin: os.Getenv("REDIRECT_ORIGIN"),
+		CookieDomain:   os.Getenv("COOKIE_DOMAIN"),
+		SecureCookie:   os.Getenv("COOKIE_SECURE") == "true",
 		Google: tideauth.Google{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),

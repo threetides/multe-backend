@@ -173,6 +173,10 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/threetides/tideauth v1.3.1 h1:YVeBQZeBYOBBCH5QqgVNKDXJ5ZNrRx0k/Mc/1BAvt6E=
 github.com/threetides/tideauth v1.3.1/go.mod h1:Ersv6D5TCa96D85GtKlETfJffUs0pb0YzF6TYb5OCtc=
+github.com/threetides/tideauth v1.4.0 h1:XdZsGt2ugD395rS4gvmyvhadNsbOtQf2WFkG/9FHw7I=
+github.com/threetides/tideauth v1.4.0/go.mod h1:ryb7GYTljb2/WhaOukLYes6SDrUtaqZtmGu3ePfwVnE=
+github.com/threetides/tideauth v1.5.0 h1:RzcpkMsAT5gVMRapF9pLpW2zwyl3zIxBfDRUSKoRg8w=
+github.com/threetides/tideauth v1.5.0/go.mod h1:ryb7GYTljb2/WhaOukLYes6SDrUtaqZtmGu3ePfwVnE=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
